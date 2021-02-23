@@ -267,7 +267,6 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                     wait_time=0,
                     out_file=None):
         """Draw `result` over `img`.
-
         Args:
             img (str or Tensor): The image to be displayed.
             result (Tensor or tuple): The results to draw over `img`
@@ -285,7 +284,6 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 Default: False.
             out_file (str or None): The filename to write the image.
                 Default: None.
-
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
@@ -297,7 +295,9 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 segm_result = segm_result[0]  # ms rcnn
         else:
             bbox_result, segm_result = result, None
+        # bbox_result = num_classes * [num,5] = 80 * [num,5]
         bboxes = np.vstack(bbox_result)
+        # 根据每个 bbox的index和shape 生成 label
         labels = [
             np.full(bbox.shape[0], i, dtype=np.int32)
             for i, bbox in enumerate(bbox_result)
