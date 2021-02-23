@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+data/
+output/
+chineseocr_lite/
+ocr/
+
+
 # Distribution / packaging
 .Python
 build/
@@ -103,7 +109,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-data/
+
 .vscode
 .idea
 .DS_Store
