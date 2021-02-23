@@ -1,0 +1,27 @@
+torch==1.6.0
+torchvision==0.7.0
+mmdet==2.6.0
+mmcv-full==1.2.0
+opencv-python==4.4.0.46
+
+
+"""
+报错1：ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+报错2：from .cv2 import * ImportError: libgthread-2.0.so.0: cannot open shared object file: No such file or directory [duplicate]
+
+apt update
+apt install -y libgl1-mesa-glx
+
+apt install -y libglib2.0-0
+apt install -y libsm6 libxext6
+apt install -y libxrender-dev
+"""
+
+"""
+torch    1.7.1+cu101    这个安装后，torchvision就安装了
+torchvision   0.8.2+cu101
+mmdet   2.6.0
+mmcv-full   1.2.0
+opencv-python   是安装paddle的opencv版本   4.5.1.48
+
+"""

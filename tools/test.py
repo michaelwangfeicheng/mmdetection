@@ -1,5 +1,8 @@
 import argparse
+import json
 import os
+import os.path as osp
+import time
 import warnings
 
 import mmcv
@@ -14,14 +17,16 @@ from mmdet.apis import multi_gpu_test, single_gpu_test
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.models import build_detector
+from mmdet.utils import get_root_logger
 
+from tools.config.configs import *
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description='MMDet test (and eval) a model')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument('--out', help='output result file in pickle format')
+    parser.add_argument('--config', help='test config file path',default=model_config_file_path)
+    parser.add_argument('--checkpoint', help='checkpoint file',default=checkpoint)
+    parser.add_argument('--out', help='output result file in pickle format',default=eval_result_file_path)
     parser.add_argument(
         '--fuse-conv-bn',
         action='store_true',
@@ -35,13 +40,14 @@ def parse_args():
         'submit it to the test server')
     parser.add_argument(
         '--eval',
+        default=eval_metrics,
         type=str,
         nargs='+',
         help='evaluation metrics, which depends on the dataset, e.g., "bbox",'
         ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument(
-        '--show-dir', help='directory where painted images will be saved')
+        '--show-dir', help='directory where painted images will be saved',default=eval_save_image_dir)
     parser.add_argument(
         '--show-score-thr',
         type=float,
@@ -72,6 +78,7 @@ def parse_args():
         '--eval-options',
         nargs='+',
         action=DictAction,
+        default="classwise=True",
         help='custom options for evaluation, the key-value pair in xxx=yyy '
         'format will be kwargs for dataset.evaluate() function')
     parser.add_argument(
@@ -94,8 +101,16 @@ def parse_args():
     return args
 
 
-def main():
+def main(only_seal_test=True):
     args = parse_args()
+    # init the logger before other steps
+
+    timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
+
+    log_file = osp.join(output_dir, f'{"test"}-{timestamp}.log')
+    logger = get_root_logger(log_file=log_file, log_level='INFO')
+    logger.info(f"测试开始:{timestamp} ")
+    logger.info(f"checkpoint={args.checkpoint}")
 
     assert args.out or args.eval or args.format_only or args.show \
         or args.show_dir, \
@@ -172,8 +187,10 @@ def main():
     else:
         model.CLASSES = dataset.CLASSES
 
+    start_time = time.time()
+
     if not distributed:
-        model = MMDataParallel(model, device_ids=[0])
+        model = MMDataParallel(model, device_ids=[device_ids])
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
                                   args.show_score_thr)
     else:
@@ -184,10 +201,14 @@ def main():
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
                                  args.gpu_collect)
 
+    end_time =  time.time()
+    duration = end_time - start_time
+
     rank, _ = get_dist_info()
+
     if rank == 0:
         if args.out:
-            print(f'\nwriting results to {args.out}')
+            logger.info(f'\nwriting results to {args.out}')
             mmcv.dump(outputs, args.out)
         kwargs = {} if args.eval_options is None else args.eval_options
         if args.format_only:
@@ -197,9 +218,13 @@ def main():
             # hard-code way to remove EvalHook args
             for key in ['interval', 'tmpdir', 'start', 'gpu_collect']:
                 eval_kwargs.pop(key, None)
-            eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
+            eval_kwargs.update(dict(metric=args.eval,classwise=True, **kwargs))
+            eval_results = dataset.evaluate(outputs, **eval_kwargs)
+            logger.info(eval_results)
 
+    end_timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
+    logger.info(f"在{end_timestamp}测试结束,共在{duration}时间内测试{outputs.__len__()}张图片：{outputs.__len__()/duration} pic/secs")
 
 if __name__ == '__main__':
+
     main()

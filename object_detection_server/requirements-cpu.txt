@@ -1,0 +1,5 @@
+torch==1.6.0
+torchvision==0.7.0
+mmdet==2.6.0
+mmcv-full==1.2.0
+opencv-python==4.4.0.46

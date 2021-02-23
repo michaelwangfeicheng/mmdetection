@@ -16,12 +16,13 @@ from mmdet.apis import set_random_seed, train_detector
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 from mmdet.utils import collect_env, get_root_logger
-
+from tools.convert_model_config_format import convert_model_config_format
+from tools.config.configs import *
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
-    parser.add_argument('config', help='train config file path')
-    parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument('--config', help='train config file path',default=model_config_file_path)
+    parser.add_argument('--work-dir', help='the dir to save logs and models',default=output_dir)
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(
@@ -31,11 +32,13 @@ def parse_args():
     group_gpus = parser.add_mutually_exclusive_group()
     group_gpus.add_argument(
         '--gpus',
+        default=gpus, # 如果不想采用分布式的训练方式，则运行下方的代码
         type=int,
         help='number of gpus to use '
         '(only applicable to non-distributed training)')
     group_gpus.add_argument(
         '--gpu-ids',
+        default=device_ids,
         type=int,
         nargs='+',
         help='ids of gpus to use '
@@ -81,8 +84,9 @@ def parse_args():
 
 def main():
     args = parse_args()
-
+    # 读取配置文件
     cfg = Config.fromfile(args.config)
+
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
     # import modules from string list.
@@ -112,20 +116,25 @@ def main():
     if args.launcher == 'none':
         distributed = False
     else:
+        # init_dist 来完成初始化
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
 
     # create work_dir
     mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
-    # dump config
-    cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
+    # dump config 保存 py格式 的模型配置文件
+    output_cfg_path = osp.join(cfg.work_dir, osp.basename(args.config))
+    cfg.dump(output_cfg_path)
+    # 读取 py格式的模型配置文件，将其转换为txt格式的模型配置文件
+    convert_model_config_format(config_file_path=output_cfg_path)
     # init the logger before other steps
-    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-    log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
+    timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
+    log_file = osp.join(cfg.work_dir, f'{"train"}-{timestamp}.log')
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
 
     # init the meta dict to record some important information such as
     # environment info and seed, which will be logged
+
     meta = dict()
     # log env info
     env_info_dict = collect_env()
@@ -133,6 +142,8 @@ def main():
     dash_line = '-' * 60 + '\n'
     logger.info('Environment info:\n' + dash_line + env_info + '\n' +
                 dash_line)
+    cwd = os.getcwd()
+    logger.info('cwd={}'.format(cwd))
     meta['env_info'] = env_info
     meta['config'] = cfg.pretty_text
     # log some basic info
@@ -148,9 +159,11 @@ def main():
     meta['seed'] = args.seed
     meta['exp_name'] = osp.basename(args.config)
 
+    # 创建模型
     model = build_detector(
         cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
 
+    # 创建 datasets
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -175,4 +188,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # train_dir = os.path.join(cwd,'tools')
+    # os.chdir(train_dir)
     main()

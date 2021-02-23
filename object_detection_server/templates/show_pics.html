@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <div>
+        <ul>
+            {% if path is not None %}
+                {% for i in path %}
+                    <li><img src="{{ static_url('images/{}'.format(i)) }}" alt=""></li>
+                {% end %}
+            {% end %}
+        </ul>
+    </div>
+
+</body>
+</html>

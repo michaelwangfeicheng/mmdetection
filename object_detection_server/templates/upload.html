@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Tornado MMDetection Application{% end %}
+
+{% block header %}
+<h1>Tornado MMDetection App 目标检测</h1>
+{% end %}
+
+{% block content %}
+{% if img_error %}
+<font color="red">{{ img_error }}</font>
+{% end %}
+
+<!--如果表单需要上传文件，需要设置enctype="multipart/form-data" 否则文件无法找到 -->
+<form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="image">
+    <input type="submit" value="提交">
+</form>
+
+{% if path is not None %}
+    <table class="table" style="width:100%">
+        <thead id="index">
+        <tr>
+            {% for title in ['原始图片','生成图片'] %}
+            <th>{{ title }}</th>
+            {% end %}
+        </tr>
+        </thead>
+        <tbody id="body">
+        <tr>
+            {% for i in path %}
+            <td border: 10px solid black;><img src="{{ static_url('images/{}'.format(i)) }}" alt=""></td>
+            {% end %}
+        </tr>
+        </tbody>
+    </table>
+{% end %}
+
+{% end %}

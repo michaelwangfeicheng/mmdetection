@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>
+        {% block title %}Tornado Title{% end %}
+    </title>
+    <!--<link rel="stylesheet" href="{{ static_url('css/style.css') }}">-->
+</head>
+<body>
+<header>
+    {% block header %}{% end %}
+</header>
+
+
+<content>
+    {% block content %}{% end %}
+</content>
+
+<footer>
+    {% block footer %}
+    <p>
+        For more information,please email us at
+        <a href="contact@hundsun.com">contact@hundsun.com</a>.
+    </p>
+    {% end %}
+</footer>
+</body>
+</html>
