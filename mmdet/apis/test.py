@@ -17,13 +17,29 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3
+                    ):
+    """
+    @author:wangfc27441
+    @desc:
+    模型评估的时候增加 drop_overlaped_bbox 参数
+
+    @version：
+    @time:2021/2/24 17:02
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
     model.eval()
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
+            # 批处理数据
             result = model(return_loss=False, rescale=True, **data)
 
         batch_size = len(result)

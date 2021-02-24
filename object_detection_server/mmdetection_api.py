@@ -58,6 +58,8 @@ def seal_detection(model, image: np.ndarray, score_thr: float = 0.3, if_ger_proc
     """
     @author:wangfc27441
     @desc:
+
+
     输入: 一张图片 image = cv.imread(test_img_path,1) # load image as bgr
     输出：识别出 印章所在的位置信息 list[json]  （+ processed_image as bgr）
     @version：
@@ -122,7 +124,9 @@ def get_result(result,
     """
     @author:wangfc27441
     @desc:
-    输入 mmdetection 预测结果，转变为我们需要的格式
+        改动自 mmdet.model.detectors.base.show_result
+
+    输入 mmdetection （单张图片）预测结果，转变为我们需要的格式
     1. 增加 only_seal_detection 参数： 可以多个不同的印章子类型中 返回 印章父类型
     2.  drop_duplicate_size：
     @version：
@@ -130,24 +134,25 @@ def get_result(result,
 
     Parameters
     ----------
+    bbox_result: 单个图片的预测结果 list ,len=num_classes, bbox_result[0].shape = [pred_num,5]
 
     Returns
     -------
     """
-
     if isinstance(result, tuple):
         bbox_result, segm_result = result
         if isinstance(segm_result, tuple):
             segm_result = segm_result[0]  # ms rcnn
     else:
         bbox_result, segm_result = result, None
-    # bbox_result = num_classes * [num,5] = 80 * [num,5]
+    # bbox_result = num_classes * [num,5] = 80 * [num,5], bboxes.shape = (pred_nums,5)
     bboxes = np.vstack(bbox_result)
     # 根据每个 bbox的index和shape 生成 label
     labels = [
         np.full(bbox.shape[0], i, dtype=np.int32)
         for i, bbox in enumerate(bbox_result)
     ]
+    # labels.shape = (pred_nums,)
     labels = np.concatenate(labels)
 
     assert bboxes.ndim == 2
@@ -244,7 +249,20 @@ def show_result(img_path, bbox_results, annotation=None, show=True, fig_size=(20
 
 
 def nms_after_detection(dets, scores, labels, thresh=0.5):
-    """Pure Python NMS baseline."""
+    """
+    @author:wangfc27441
+    @desc:
+    对不同类型的bbox进行 NMS
+
+    @version：
+    @time:2021/2/24 17:59
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
     x1 = dets[:, 0]  # pred bbox top_x
     y1 = dets[:, 1]  # pred bbox top_y
     x2 = dets[:, 2]  # pred bbox bottom_x
@@ -252,26 +270,26 @@ def nms_after_detection(dets, scores, labels, thresh=0.5):
     # scores = dets[:, 4]  # pred bbox cls score
 
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)  # pred bbox areas
-    order = scores.argsort()[::-1]  # 对pred bbox按score做降序排序，对应(2)-1
-
+    order = scores.argsort()[::-1]  # 对pred bbox按score做降序排序
     keep = []  # NMS后，保留的 pred bbox
     while order.size > 0:
         i = order[0]  # top-1 score bbox
         keep.append(i)  # top-1 score的话，自然就保留了
+        # 计算和其他边框的交叉点
         xx1 = np.maximum(x1[i], x1[order[1:]])  # top-1 bbox（score最大）与order中剩余bbox计算NMS
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])
         yy2 = np.minimum(y2[i], y2[order[1:]])
-
+        # 计算交叉的宽和高，如果不交叉的话=0
         w = np.maximum(0.0, xx2 - xx1 + 1)
         h = np.maximum(0.0, yy2 - yy1 + 1)
         inter = w * h
         ovr = inter / (areas[i] + areas[order[1:]] - inter)  # IoU计算
+        # 这个操作可以对代码断点调试理解下，结合(2)-2，我们希望剔除所有与当前top-1 bbox IoU > thresh的冗余bbox，那么保留下来的bbox，自然就是ovr <= thresh的非冗余bbox，其inds保留下来，作进一步筛选
+        inds = np.where(ovr <= thresh)[0]
+        # 保留有效bbox，就是这轮NMS未被抑制掉的幸运儿，为什么 + 1？因为ind = 0就是这轮NMS的top-1，剩余有效bbox在IoU计算中与top-1做的计算，inds对应回原数组，自然要做 +1 的映射，接下来就是的循环
+        order = order[inds + 1]
 
-        inds = np.where(ovr <= thresh)[
-            0]  # 这个操作可以对代码断点调试理解下，结合(2)-2，我们希望剔除所有与当前top-1 bbox IoU > thresh的冗余bbox，那么保留下来的bbox，自然就是ovr <= thresh的非冗余bbox，其inds保留下来，作进一步筛选
-        order = order[
-            inds + 1]  # 保留有效bbox，就是这轮NMS未被抑制掉的幸运儿，为什么 + 1？因为ind = 0就是这轮NMS的top-1，剩余有效bbox在IoU计算中与top-1做的计算，inds对应回原数组，自然要做 +1 的映射，接下来就是的循环
 
     keep_dets = dets[keep]
     keep_scores = scores[keep]
@@ -370,7 +388,8 @@ if __name__ == '__main__':
     # index =0
     # while index < test_num:
         image_index = index % test_image_size
-        test_image_name = test_data_filenames[image_index]
+        # test_image_name = test_data_filenames[image_index]
+        test_image_name = '实际控制关系账户组报备提示_2021012200332252_1.jpg'
         test_img_path = os.path.join(test_data_dir, test_image_name)
         print(f'index={index},test_img_path={test_img_path}')
         test_img_bgr = cv.imread(test_img_path, 1)  # load image as bgr

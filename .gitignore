@@ -10,6 +10,7 @@ data/
 output/
 chineseocr_lite/
 ocr/
+object_detection_server/model
 
 
 # Distribution / packaging
