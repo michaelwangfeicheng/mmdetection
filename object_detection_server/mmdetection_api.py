@@ -71,9 +71,9 @@ def seal_detection(model, image: np.ndarray, score_thr: float = 0.3, if_ger_proc
     -------
     """
     # transform image to rgb
-    image_rbg = image[:, :, ::-1]
+    # image_rbg = image[:, :, ::-1]
     # 使用模型进行预测
-    result = inference_detector(model, img=image_rbg)
+    result = inference_detector(model, img=image)
     # 获取识别结果
     output_result = get_result(result=result, class_names=model.CLASSES, score_thr=score_thr,
                                only_seal_detection=only_seal_detection)
@@ -358,7 +358,7 @@ if __name__ == '__main__':
 
     logger = build_logger(log_dir=os.path.dirname(__file__), logger_name='object_detection_server')
 
-    test_data_dir = os.path.join(working_dir, 'object_detection_server', 'test_data', 'seal_data_real', 'test_error_data')
+    test_data_dir = os.path.join(working_dir, 'data', 'test_data_20210224')
     test_data_filenames = [image_name for image_name in os.listdir(test_data_dir) if
                            image_name.split(".")[-1] in ['png', 'jpg', 'tif', 'bmp']]
     test_image_size = test_data_filenames.__len__()
@@ -378,7 +378,7 @@ if __name__ == '__main__':
         result, processed_image = seal_detection(model=model, image=test_img_bgr,only_seal_detection=False,
                                                  if_ger_processed_image=True)
         print(f'result={result}')
-        eval_images_dir = os.path.join(test_data_dir,'eval_images_model_7_classes_epoch_12')
+        eval_images_dir = os.path.join(test_data_dir,f'eval_images_model_{num_classes}_classes_epoch_{test_epoch}_{test_no}')
         os.makedirs(eval_images_dir,exist_ok=True)
         eval_image_path = os.path.join(eval_images_dir,test_image_name)
         cv.imwrite(eval_image_path,processed_image)
