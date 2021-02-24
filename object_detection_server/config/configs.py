@@ -45,11 +45,11 @@ checkpoint_epoch = config_parser.getint('infer', 'checkpoint_epoch')
 config_file = config_parser.get('infer', 'config_file')
 # 模型的目录
 
-model_dir = os.path.join('../model',f'model_classes_{num_classes}_{test_no}')
+model_dir = os.path.join('../model',f'model_{num_classes}_classes_{test_no}')
 config_path = os.path.join(model_dir,config_file)
 config_file_absolute_path = _get_module_path(config_path)
 # 模型
-checkpoint_path = os.path.join(model_dir,config_file,f"epoch_{checkpoint_epoch}.pth")
+checkpoint_path = os.path.join(model_dir,f"epoch_{checkpoint_epoch}.pth")
 checkpoint_file_absolute_path = _get_module_path(checkpoint_path)
 # api识别结果是否返回处理过的图片
 if_ger_processed_image = config_parser.getboolean('infer', 'if_ger_processed_image')

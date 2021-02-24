@@ -378,7 +378,7 @@ if __name__ == '__main__':
         result, processed_image = seal_detection(model=model, image=test_img_bgr,only_seal_detection=False,
                                                  if_ger_processed_image=True)
         print(f'result={result}')
-        eval_images_dir = os.path.join(test_data_dir,f'eval_images_model_{num_classes}_classes_epoch_{test_epoch}_{test_no}')
+        eval_images_dir = os.path.join(test_data_dir,f'eval_images_model_{num_classes}_classes_epoch_{checkpoint_epoch}_{test_no}')
         os.makedirs(eval_images_dir,exist_ok=True)
         eval_image_path = os.path.join(eval_images_dir,test_image_name)
         cv.imwrite(eval_image_path,processed_image)
