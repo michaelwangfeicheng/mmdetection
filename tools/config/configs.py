@@ -18,7 +18,7 @@
 
 """
 num_classes = 5
-test_num = "002"
+test_num = "001"
 dataset_type = 'CocoDataset'                    # 数据集类型
 data_root = f'data_generator/test_data_{num_classes}_classes_{test_num}/'  # 数据集根目录
 test_data_root = "object_detection_server/test_data/seal_data_real/"
@@ -31,9 +31,9 @@ output_dir = f'output/faster_rcnn_r50_fpn_1x_{num_classes}_classes_{test_num}/'
 total_epochs = 12                                # 最大epoch数
 samples_per_gpu=8                                 # 每个gpu计算的图像数量:
 gpus =2
-device_ids= [1]
+device_ids= 1
 
-test_epoch = 3
+test_epoch = 12
 checkpoint = output_dir + f'epoch_{test_epoch}.pth'
 eval_result_file_path = output_dir + 'eval_result.pkl'
 eval_save_image_dir =  output_dir + f'eval_images_epoch_{test_epoch}'

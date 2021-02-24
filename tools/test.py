@@ -78,7 +78,7 @@ def parse_args():
         '--eval-options',
         nargs='+',
         action=DictAction,
-        default="classwise=True",
+        # default="classwise=True",
         help='custom options for evaluation, the key-value pair in xxx=yyy '
         'format will be kwargs for dataset.evaluate() function')
     parser.add_argument(
@@ -218,7 +218,7 @@ def main(only_seal_test=True):
             # hard-code way to remove EvalHook args
             for key in ['interval', 'tmpdir', 'start', 'gpu_collect']:
                 eval_kwargs.pop(key, None)
-            eval_kwargs.update(dict(metric=args.eval,classwise=True, **kwargs))
+            eval_kwargs.update(dict(metric=args.eval,classwise=True,logger=logger, **kwargs))
             eval_results = dataset.evaluate(outputs, **eval_kwargs)
             logger.info(eval_results)
 
