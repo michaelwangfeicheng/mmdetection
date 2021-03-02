@@ -56,7 +56,7 @@ def build_logger(log_dir, logger_name, log_level='INFO'):
 def seal_detection(model, image: np.ndarray, score_thr: float = 0.3, if_ger_processed_image=False,
                    only_seal_detection=False):
     """
-    @author:wangfc27441
+    @author:wangfc
     @desc:
 
 

@@ -4,17 +4,11 @@
 @file: 
 @version: 
 @desc:  
-@author: wangfc
-@site: http://www.hundsun.com
-@time: 2021/2/2 8:56 
+@time: 2021/2/2 8:56
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
 2021/2/2 8:56   wangfc      1.0         None
-
- * 密级：秘密
- * 版权所有：恒生电子股份有限公司 2019
- * 注意：本内容仅限于恒生电子股份有限公司内部传阅，禁止外泄以及用于其他的商业目的
 
 """
 import re
@@ -61,7 +55,7 @@ LABEL2CATEGORY_MAPPING = {'红色圆形印章': "round_seal",
                           }
 
 
-def get_labels(label_lines):
+def get_labels(image_dir,label_lines):
     total_labels = []
     for index, label_line in enumerate(label_lines):
         # label_line = label_lines[0]
@@ -106,7 +100,7 @@ def labelImg_annotations2COCO(data_type, categories_path, image_dir, output_anno
         label_lines = f.readlines()
         print(f"labelImg_annotations 共有{label_lines.__len__()}条标注数据")
 
-    labels = get_labels(label_lines)
+    # labels = get_labels(image_dir,label_lines)
 
     license = 1
     image_id = 1
@@ -198,14 +192,40 @@ def labelImg_annotations2COCO(data_type, categories_path, image_dir, output_anno
         json.dump(instances_json, f, indent=4, ensure_ascii=False)
     print(f'unfounded_image_num={unfounded_image_num},有效的图片共{image_id-1}张，共有{annotation_id-1}标注')
     print("Saving out instances Annotations of {} in {}".format(data_type, output_annotations_json_path))
+    return instances_json
+
+
+def get_coco_annotations(train_data_root, test_data_root,img_prefix='test', data_type='test'):
+    """
+    @author:wangfc27441
+    @desc:
+      # 读取人工标注的信息，转换为 coco格式
+    @version：
+    @time:2021/2/25 9:18
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+    # 训练数据中的类型信息
+    categories_path = os.path.join(train_data_root, 'annotations', 'coco_format_categories.json')
+    # 测试数据的图片路径
+    image_dir = os.path.join(test_data_root, img_prefix)
+    # 测试数据中的人工标注信息 labelImg标注
+    output_annotations_dir = os.path.join(test_data_root, 'annotations')
+    labelImg_annotations_path = os.path.join(output_annotations_dir, 'Label.txt')
+    # 转换为 COCO
+    labelImg_annotations2COCO(data_type, categories_path, image_dir, output_annotations_dir, labelImg_annotations_path)
+
 
 
 if __name__ == '__main__':
     from tools.config.configs import data_root
     data_type = 'test'
     # 不包含 二维码的数据
-    categories_path = os.path.join(data_root,'annotations',
-                                   'coco_format_categories.json')
+    categories_path = os.path.join(data_root,'annotations', 'coco_format_categories.json')
     image_dir = os.path.join(os.getcwd(), 'object_detection_server', 'test_data', 'seal_data_real', 'test')
     output_annotations_dir = os.path.join(os.path.dirname(image_dir), 'annotations')
     labelImg_annotations_path = os.path.join(output_annotations_dir, 'Label.txt')

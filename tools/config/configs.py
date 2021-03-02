@@ -18,10 +18,10 @@
 
 """
 num_classes = 5
-test_num = "001"
+test_num = "002"
 dataset_type = 'CocoDataset'                    # 数据集类型
-data_root = f'data_generator/test_data_{num_classes}_classes_{test_num}/'  # 数据集根目录
-test_data_root = "object_detection_server/test_data/seal_data_real/"
+data_root = f'data/test_data_{num_classes}_classes_{test_num}/'  # 数据集根目录
+test_data_root = "data/seal_data_real/"
 # DETECTION_CLASSES = ("back_idcard",  "ellipse_seal","front_idcard", "rectangle_name_seal","round_seal","square_name_seal")
 # DETECTION_CLASSES = ("back_idcard",  "ellipse_seal","front_idcard","qrcode", "rectangle_name_seal","round_seal","square_name_seal")
 

@@ -4,17 +4,12 @@
 @file: 
 @version: 
 @desc:  
-@author: wangfc
-@site: http://www.hundsun.com
-@time: 2021/2/2 17:07 
+@time: 2021/2/2 17:07
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
 2021/2/2 17:07   wangfc      1.0         None
 
- * 密级：秘密
- * 版权所有：恒生电子股份有限公司 2019
- * 注意：本内容仅限于恒生电子股份有限公司内部传阅，禁止外泄以及用于其他的商业目的
 
 """
 import itertools
@@ -36,6 +31,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from terminaltables import AsciiTable
 
+from object_detection_server.labelImg2COCO import get_coco_annotations
 from object_detection_server.mmdetection_api import seal_detection
 
 
@@ -54,12 +50,12 @@ class COCODatasetEvaluation():
     -------
     """
     # 自定义数据集的类型
-    CLASSES = ("back_idcard", "ellipse_seal", "front_idcard", "rectangle_name_seal", "round_seal", "square_name_seal")
+    # CLASSES = ("back_idcard", "ellipse_seal", "front_idcard", "rectangle_name_seal", "round_seal", "square_name_seal")
 
-    def __init__(self, data_root, img_prefix='test', ann_file='annotations/test.json', only_seal_detection=True,
+    def __init__(self, data_root, img_prefix='test', ann_file='annotations/test.json', only_seal_detection=False,
                  if_remove_other_supercategory=True,
                  test_mode=True, classes=None):
-        # 判断是否需要转换为 印章父类型
+        # 判断 是否需要转换为 印章父类型
         self.only_seal_detection = only_seal_detection
         self.if_remove_other_supercategory = if_remove_other_supercategory
         self.supercategory_annotations_json_file = 'supercategory.json'
@@ -67,6 +63,9 @@ class COCODatasetEvaluation():
         self.supercategory2new_id_dict = None
         self.name_id2supercategory_id_dict = None
         self.name2supercategory_id_dict = None
+
+        # 增加 预测的label与 category_id 的对应关系
+        self.label2cat =None
 
         self.ann_file = ann_file
         self.data_root = data_root
@@ -89,7 +88,7 @@ class COCODatasetEvaluation():
             #         or osp.isabs(self.proposal_file)):
             #     self.proposal_file = osp.join(self.data_root,
             #                                   self.proposal_file)
-
+        # 如果进行 父类的评估，需要生成对应的标注信息
         if self.only_seal_detection:
             self.get_supercategory_annotations(self.ann_file)
 
@@ -317,12 +316,17 @@ class COCODatasetEvaluation():
             self.coco = COCO(self.supercategory_annotations_json_path)
             cat_names = sorted([name_info['name'] for name_info in self.coco.cats.values()])
             self.cat_ids = self.coco.get_cat_ids(cat_names=cat_names)
-
         else:
             self.coco = COCO(ann_file)
+            # 获取coco标注时候的 category_ids = [1,2,3,4,5]
             self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
-
+        # 获取 coco category_id：label对应关系 {1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
+
+        # 增加 预测的label与 category_id 的对应关系
+        categories_info = self.coco.cats
+        self.label2cat = {category_info['name']:category_info['id'] for index,category_info in  categories_info.items()}
+
         self.img_ids = self.coco.get_img_ids()
         data_infos = []
         for i in self.img_ids:
@@ -403,7 +407,9 @@ class COCODatasetEvaluation():
                     # 使用 输出的 label 来返回 supercategory_id
                     category_id = self.supercategory2new_id_dict[label]
                 else:
-                    category_id = self.cat_ids[label]
+                    # 需要把 预测的label 转换为 category_id
+                    # category_id = self.cat_ids[label]
+                    category_id = self.label2cat[label]
 
                 data['category_id'] = category_id
                 json_results.append(data)
@@ -445,8 +451,9 @@ class COCODatasetEvaluation():
             json_results = self._proposal2json(results)
             result_files['proposal'] = f'{outfile_prefix}.proposal.json'
             mmcv.dump(json_results, result_files['proposal'])
-        # 增加 识别结果为 dict 的情况
+
         elif isinstance(results[0], dict):
+            # 增加 识别结果为 dict 的情况
             json_results = self._det_dict2json(results)
             result_files['bbox'] = f'{outfile_prefix}.bbox.json'
             result_files['proposal'] = f'{outfile_prefix}.bbox.json'
@@ -473,7 +480,7 @@ class COCODatasetEvaluation():
         assert isinstance(results, list), 'results must be a list'
         assert len(results) == self.img_ids.__len__(), (
             'The length of results is not equal to the dataset len: {} != {}'.
-                format(len(results),  self.img_ids.__len__()))
+                format(len(results), self.img_ids.__len__()))
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -847,40 +854,71 @@ class COCODatasetEvaluation():
         return eval_results
 
 
-def detection_evaluate(model, data_root, img_prefix='test', ann_file='annotations/test.json'):
+def detection_evaluate(model, data_root,results_file='results.pkl',overwrite_results=True, img_prefix='test', ann_file='annotations/test.json'):
+    """
+    @author:wangfc27441
+    @desc:
+    根据 接口预测结果进行评估
+    @version：
+    @time:2021/2/25 9:10 
+    
+    Parameters
+    ----------
+    
+    Returns
+    -------
+    """
+
+    # 读取标注数据信信息
     coco_dataset_evaluation = COCODatasetEvaluation(
         data_root=data_root,
         img_prefix=img_prefix,
-        ann_file=ann_file)
+        ann_file=ann_file,classes=model.CLASSES)
 
-    image_size = coco_dataset_evaluation.img_ids.__len__()
-    results = []
-    start_time = time.time()
-    for image_idx, image_id in enumerate(coco_dataset_evaluation.img_ids):
-        # 获取每张图片的信息
-        img_info = coco_dataset_evaluation.getitem(idx=image_idx)
-        filename = img_info['filename']
-        image_id_in_annotation = img_info['id']
-        # 验证  image_idx  输出的图片 image_id 和标注的数据一致
-        assert image_id == image_id_in_annotation
-        test_img_path = os.path.join(data_root, img_prefix, filename)
-        print(f'image_idx={image_idx},image_id={image_id},test_img_path={test_img_path}')
-        test_img_bgr = cv.imread(test_img_path, 1)  # load image as bgr
-        # 使用模型进行预测
-        bbox_results, processed_image = seal_detection(model=model, image=test_img_bgr)
-        print(f'bbox_results={bbox_results}')
-        # img_drawed = show_result(img_path=test_img_path, output_result=output_result, fig_size=(20, 15))
-        results.append({'filename': filename, 'bbox_results': bbox_results})
-    end_time = time.time()
-    duration = end_time - start_time
+    object_detection_results_path = os.path.join(data_root,results_file)
+    if not overwrite_results and os.path.exists(object_detection_results_path):
+        results= mmcv.load(file=object_detection_results_path)
+    else:
+        image_size = coco_dataset_evaluation.img_ids.__len__()
+        results = []
+        start_time = time.time()
+        for image_idx, image_id in enumerate(coco_dataset_evaluation.img_ids):
+
+            # 获取每张图片的信息
+            img_info = coco_dataset_evaluation.getitem(idx=image_idx)
+            filename = img_info['filename']
+            image_id_in_annotation = img_info['id']
+            # 验证  image_idx  输出的图片 image_id 和标注的数据一致
+            assert image_id == image_id_in_annotation
+            test_img_path = os.path.join(data_root, img_prefix, filename)
+
+            test_img_bgr = cv.imread(test_img_path, 1)  # load image as bgr
+            # 使用模型进行预测
+            bbox_results, processed_image = seal_detection(model=model, image=test_img_bgr)
+
+            # img_drawed = show_result(img_path=test_img_path, output_result=output_result, fig_size=(20, 15))
+            results.append({'filename': filename, 'bbox_results': bbox_results})
+            if image_idx %10==0:
+                logger.info(f"开始预测第{image_idx}张图片")
+                logger.info(f'image_idx={image_idx},image_id={image_id},test_img_path={test_img_path}')
+                logger.info(f'bbox_results={bbox_results}')
+
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.info(
+                f"共在{duration}时间内测试{image_size}张图片：{image_size / duration} pics/sec, {duration * 1000 / image_size} milliseconds")
+
+        logger.info(f"存储预测得到的results到{object_detection_results_path}")
+        mmcv.dump(obj=results,file=object_detection_results_path)
+
     eval_results = coco_dataset_evaluation.evaluate(results=results)
     end_timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
-    logger.info(
-        f"eval_results={eval_results}\n{end_timestamp}测试结束,device={device},共在{duration}时间内测试{image_size}张图片：{image_size / duration} pics/sec, {duration * 1000 / image_size} milliseconds")
+    logger.info(f"eval_results={eval_results}\n{end_timestamp}测试结束,device={device}")
 
 
-def get_annotation(image_id,annotations):
-    return [annotation  for anno_id,annotation in annotations.items() if annotation['image_id']==image_id]
+def get_annotation(image_id, annotations):
+    return [annotation for anno_id, annotation in annotations.items() if annotation['image_id'] == image_id]
+
 
 
 
@@ -889,21 +927,24 @@ if __name__ == '__main__':
     working_dir = (os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     # 增加当前路径为 包搜索路径
     sys.path.append(working_dir)
+    from tools.config.configs import data_root as train_data_root
+
     from object_detection_server.config.configs import *
     from object_detection_server.mmdetection_api import build_logger
-    logger = build_logger(log_dir=os.path.dirname(__file__), logger_name= 'object_detection_server')
-
     # 当从任意位置启动该脚本的时候，需要加入其对应的搜索路径
     from object_detection_server.load_model import model
 
-    data_root = os.path.join(working_dir, 'object_detection_server', 'test_data', 'seal_data_real')
+    logger = build_logger(log_dir=os.path.dirname(__file__), logger_name='object_detection_evaluation')
+    test_data_root = os.path.join(working_dir, 'data', 'seal_data_real')
     img_prefix = 'test'
+    # 创建 coco_annotations
+    coco_annotations_dict = get_coco_annotations(train_data_root=train_data_root,test_data_root=test_data_root)
 
     single_evaluate = False
     if not single_evaluate:
-        detection_evaluate(model=model,data_root=data_root)
+        detection_evaluate(model=model, data_root=test_data_root,overwrite_results=False)
     else:
-        coco_dataset_evaluation = COCODatasetEvaluation(data_root=data_root)
+        coco_dataset_evaluation = COCODatasetEvaluation(data_root=test_data_root)
         annotations = coco_dataset_evaluation.coco.anns
 
         image_idx = 0
@@ -915,9 +956,8 @@ if __name__ == '__main__':
         image_id_in_annotation = img_info['id']
         # 验证  image_idx  输出的图片 image_id 和标注的数据一致
         assert image_id == image_id_in_annotation
-        test_img_path = os.path.join(data_root, img_prefix, filename)
+        test_img_path = os.path.join(test_data_root, img_prefix, filename)
         logger.info(f'image_idx={image_idx},image_id={image_id},test_img_path={test_img_path}')
-
 
         # 使用模型进行预测
         test_img_bgr = cv.imread(test_img_path)  # load image as bgr
@@ -925,5 +965,4 @@ if __name__ == '__main__':
         annotation = get_annotation(image_id=image_id, annotations=annotations)
 
         # 对单个数据进行评估
-        coco_dataset_evaluation.evaluate_single_result(image_index=image_idx,result=bbox_results)
-
+        coco_dataset_evaluation.evaluate_single_result(image_index=image_idx, result=bbox_results)
